@@ -2,8 +2,10 @@
 * Copyright (c) Bentley Systems, Incorporated. All rights reserved.
 * See LICENSE.md in the project root for license terms and full copyright notice.
 *--------------------------------------------------------------------------------------------*/
-import { ContextRealityModelProps, FeatureAppearance, OrbitGtBlobProps, RealityDataFormat, RealityDataProvider } from "@itwin/core-common";
-import { IModelApp, IModelConnection, ScreenViewport } from "@itwin/core-frontend";
+import { Id64String } from "@itwin/core-bentley";
+import { ContextRealityModel, ContextRealityModelProps, FeatureAppearance, ModelProps, ModelQueryParams, OrbitGtBlobProps, RealityDataFormat, RealityDataProvider, SpatialClassifier, SpatialClassifierFlags, SpatialClassifierInsideDisplay, SpatialClassifierOutsideDisplay } from "@itwin/core-common";
+import { IModelApp, IModelConnection, ScreenViewport, SpatialModelState, SpatialViewState, Viewport } from "@itwin/core-frontend";
+import { SelectOption } from "@itwin/itwinui-react";
 import { RealityDataAccessClient, RealityDataResponse } from "@itwin/reality-data-client";
 
 export default class RealityDataApi {
@@ -22,6 +24,7 @@ export default class RealityDataApi {
       const tilesetUrl = await IModelApp.realityDataAccess?.getRealityDataUrl(imodel.iTwinId, rdSourceKey.id);
       if (tilesetUrl) {
         const entry: ContextRealityModelProps = {
+          classifiers: [],
           rdSourceKey,
           tilesetUrl,
           name,
@@ -77,6 +80,58 @@ export default class RealityDataApi {
 
 
     return true;
+  }
+
+  public static async getAvailableClassifierListForViewport(vp?: Viewport): Promise<SelectOption<Id64String>[]> {
+    const models: SelectOption<string>[] = [];
+    if (!vp || !(vp.view instanceof SpatialViewState))
+      return Promise.resolve(models);
+
+    const modelQueryParams: ModelQueryParams = {
+      from: SpatialModelState.classFullName,
+      wantPrivate: false,
+    };
+
+    let curModelProps: ModelProps[] = new Array<ModelProps>();
+    curModelProps = await vp.iModel.models.queryProps(modelQueryParams);
+
+    // Filter out models that are not classifiers and form {[key: string]: string } object
+    for (const modelProps of curModelProps) {
+      if (modelProps.id && modelProps.name !== "PhiladelphiaClassification" && modelProps.name !== "Philadelphia_Pictometry") {
+        const modelId = modelProps.id;
+        const name = modelProps.name ? modelProps.name : modelId;
+        models.push({ value: modelId, label: name.substring(0, name.indexOf(",")) });
+      }
+    }
+
+    return Promise.resolve(models);
+  }
+
+  public static setRealityDataClassifier(vp: ScreenViewport, classifierId: string) {
+    const realityModel: ContextRealityModel = vp.displayStyle.settings.contextRealityModels.models[0];
+
+    const flags = new SpatialClassifierFlags(
+      SpatialClassifierInsideDisplay.On,
+      SpatialClassifierOutsideDisplay.Dimmed,
+      false
+    );
+
+    const classifier: SpatialClassifier = new SpatialClassifier(
+      classifierId,
+      `${classifierId}`,
+      flags,
+      3.5
+    );
+
+    const existingClassifier = realityModel.classifiers?.findEquivalent(classifier);
+    if (existingClassifier) {
+      realityModel.classifiers?.replace(existingClassifier, classifier);
+    } else {
+      realityModel.classifiers?.add(classifier);
+    }
+  
+    realityModel.classifiers?.setActive(classifier);
+    vp.invalidateScene();
   }
 
 }
