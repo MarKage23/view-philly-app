@@ -5,6 +5,8 @@ import "./MyFirstWidget.css";
 import { Button, ToggleSwitch } from "@itwin/itwinui-react";
 import { ColorDef, ContextRealityModelProps } from "@itwin/core-common";
 import { ColorPickerButton } from "@itwin/imodel-components-react";
+import { Id64Array } from "@itwin/core-bentley";
+import { Viewport } from "@itwin/core-frontend";
 
 export const MyFirstWidget: React.FC = () => {
   const viewport = useActiveViewport();
@@ -14,6 +16,7 @@ export const MyFirstWidget: React.FC = () => {
   const [ListOfThings, setListOfThings] = React.useState<string[]>([]);
   const [classifier, setClassifier] = React.useState<string>("");
   const [hiliteColor, setHiliteColor] = React.useState<ColorDef>(ColorDef.green);
+  const [selectedBuildings, setSelectedBuildings] = React.useState<Id64Array>([]); 
 
   useEffect(() => {
     const asyncInitialize = async () => {
@@ -55,14 +58,32 @@ export const MyFirstWidget: React.FC = () => {
   setListOfThings([...ListOfThings, "NARUTO!!! SASUKE!!!"]) 
  
 } 
+const saveBuilding = async () => {
+  if (viewport?.iModel.selectionSet.isActive) { // If something is selected
+    const newSelectedBuildings = [...selectedBuildings, ...viewport.iModel.selectionSet.elements]; // Merge the current saved selection with what is currently selected
+    setSelectedBuildings(newSelectedBuildings);  // Save the new selection to the sate
+  }
+}
+const selectSavedBuildings = async () => {
+  if (viewport) {
+    viewport.iModel.selectionSet.emptyAll();
+    viewport.iModel.selectionSet.add(selectedBuildings);
+  }
+}
+const Sniper = async () => {
+  viewport?.zoomToElements(viewport.iModel.selectionSet.elements)
+}
 const thingList = ListOfThings.map((thing: string) => <li>{thing}</li>);
   return (
     <div>
       This is my first widget
       <ToggleSwitch onChange={togglePhillyReality} label='Philly Reality Data' />
       <ColorPickerButton initialColor={hiliteColor} onColorPick={onColorChange} />
+      <Button onClick={saveBuilding}>Save Selected Building</Button>
       <p/>
       <Button onClick={buttonClicked}>Button Activation</Button>
+      <Button onClick={selectSavedBuildings}>Select Saved Buildings</Button>
+      <Button onClick={Sniper}>Observation Haki</Button> 
       
       <ul>
         {thingList} 
